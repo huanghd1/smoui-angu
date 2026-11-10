@@ -1,4 +1,18 @@
 import puppeteer from 'puppeteer-core';
+import fsx from 'node:fs';
+
+function findBrowser() {
+  const candidates = [
+    process.env.EDGE_PATH,
+    process.env.CHROME_PATH,
+    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+  ].filter(Boolean);
+  for (const p of candidates) if (fsx.existsSync(p)) return p.replace(/\\/g, '\\');
+  throw new Error('No Edge/Chrome found — set EDGE_PATH');
+}
 
 const url = process.argv[2] || 'http://127.0.0.1:8123/index.html';
 const out = process.argv[3] || 'shots/shot.png';
@@ -7,7 +21,7 @@ const width = Number(process.env.W || 1440);
 const height = Number(process.env.H || 810);
 
 const browser = await puppeteer.launch({
-  executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  executablePath: process.env.EDGE_PATH || findBrowser(),
   headless: 'new',
   args: [
     '--enable-unsafe-swiftshader',
