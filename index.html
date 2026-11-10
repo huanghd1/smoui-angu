@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23f0a12e'/%3E%3C/svg%3E" />
+<title>Emberfall — 3D Web Demo</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0806; }
+  body { font-family: ui-sans-serif, system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  canvas { display: block; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; user-select: none; opacity: 0; visibility: hidden; transition: opacity .7s, visibility .7s; }
+  #hud.on { opacity: 1; visibility: visible; }
+
+  .panel { position: absolute; top: 26px; left: 30px; color: #f3e7d3; text-shadow: 0 2px 14px rgba(0,0,0,.85); }
+  .panel .score { display: flex; align-items: baseline; gap: 10px; font-size: 40px; font-weight: 600; line-height: 1; letter-spacing: .01em; }
+  .panel .score small { font-size: 11px; letter-spacing: .28em; opacity: .6; font-weight: 400; text-transform: uppercase; }
+  .panel .sub { margin-top: 10px; font-size: 11px; letter-spacing: .22em; opacity: .55; text-transform: uppercase; }
+
+  .gems { position: absolute; top: 30px; right: 34px; color: #ffe6bd; text-align: right; text-shadow: 0 2px 12px #000; }
+  .gems .n { font-size: 22px; font-weight: 600; letter-spacing: .04em; }
+  .gems .l { font-size: 10px; letter-spacing: .3em; opacity: .55; text-transform: uppercase; }
+
+  .crosshair {
+    position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; transform: translate(-50%,-50%);
+    border-radius: 50%; background: rgba(255,240,214,.8); box-shadow: 0 0 10px rgba(255,200,120,.95);
+    opacity: 0; transition: opacity .3s;
+  }
+  body.playing .crosshair { opacity: .9; }
+
+  .qpanel {
+    position: fixed; z-index: 35; top: 108px; right: 30px; width: 196px;
+    pointer-events: auto; text-align: right;
+    color: #f3e7d3; text-shadow: 0 1px 8px rgba(0,0,0,.9);
+    background: rgba(12,9,7,.42); border: 1px solid rgba(255,206,140,.14);
+    border-radius: 8px; padding: 10px 12px 11px; backdrop-filter: blur(6px);
+  }
+  .qpanel .qtitle { font-size: 9px; letter-spacing: .32em; opacity: .5; margin-bottom: 8px; }
+  .qpanel .qbtns { display: flex; gap: 6px; justify-content: flex-end; }
+  .qpanel button {
+    flex: 1; padding: 7px 0; cursor: pointer;
+    font: 11px/1 ui-sans-serif, system-ui, "Microsoft YaHei", sans-serif;
+    letter-spacing: .12em; color: #e6d6bd;
+    background: rgba(20,14,10,.55); border: 1px solid rgba(255,206,140,.22);
+    backdrop-filter: blur(4px); transition: all .16s;
+  }
+  .qpanel button:hover { border-color: rgba(255,206,140,.55); color: #ffe3b8; }
+  .qpanel button.active {
+    background: rgba(255,170,80,.16); border-color: rgba(255,206,140,.8);
+    color: #ffd79a; box-shadow: 0 0 14px rgba(255,160,60,.25);
+  }
+  .qpanel .qmeta { margin-top: 7px; font-size: 9px; letter-spacing: .14em; opacity: .45; }
+
+  #toast {    position: fixed; left: 50%; top: 46%; transform: translate(-50%, 0) scale(.9);
+    color: #ffd89a; font-size: 24px; font-weight: 600; letter-spacing: .12em;
+    text-shadow: 0 0 24px rgba(255,150,40,.9), 0 2px 10px #000;
+    opacity: 0; pointer-events: none; transition: opacity .18s, transform .4s cubic-bezier(.2,.9,.2,1);
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, -22px) scale(1); }
+
+  #start {
+    position: fixed; inset: 0; z-index: 30; display: grid; place-content: center; text-align: center; gap: 18px;
+    background: radial-gradient(120% 90% at 50% 42%, rgba(30,20,14,.55) 0%, rgba(8,6,5,.92) 68%);
+    backdrop-filter: blur(2px); cursor: pointer; transition: opacity .6s;
+  }
+  #start.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+  #start h1 { margin: 0; font-size: 42px; letter-spacing: .42em; font-weight: 300; color: #f6e9d4; text-transform: uppercase; }
+  #start .tag { font-size: 11px; letter-spacing: .5em; color: #c9b394; opacity: .75; text-transform: uppercase; }
+  #start .keys { margin-top: 26px; font-size: 12px; letter-spacing: .18em; color: #d9c7ad; opacity: .8; line-height: 2; }
+  #start .keys b { color: #ffd79a; font-weight: 600; }
+  #start .go {
+    margin-top: 10px; display: inline-block; padding: 12px 30px; border: 1px solid rgba(255,206,140,.5);
+    color: #ffd79a; font-size: 12px; letter-spacing: .34em; text-transform: uppercase;
+    background: rgba(255,170,80,.06);
+  }
+
+  #pause {
+    position: fixed; inset: 0; z-index: 25; display: none; place-content: center; text-align: center;
+    background: rgba(8,6,5,.6); backdrop-filter: blur(3px); cursor: pointer;
+  }
+  #pause.show { display: grid; }
+  #pause div { color: #f2e4cd; font-size: 12px; letter-spacing: .4em; text-transform: uppercase; opacity: .85; }
+
+  #win {
+    position: fixed; inset: 0; z-index: 28; display: none; place-content: center; text-align: center; gap: 14px;
+    background: radial-gradient(120% 90% at 50% 45%, rgba(60,32,10,.55), rgba(6,5,4,.94));
+  }
+  #win.show { display: grid; }
+  #win h2 { margin: 0; font-size: 30px; letter-spacing: .3em; font-weight: 300; color: #ffe1b0; }
+  #win p { margin: 0; font-size: 12px; letter-spacing: .28em; color: #d9c2a2; opacity: .8; text-transform: uppercase; }
+
+  #loader { position: fixed; inset: 0; z-index: 40; display: grid; place-content: center; gap: 16px; text-align: center;
+    background: radial-gradient(120% 90% at 50% 45%, #1a1410 0%, #080706 70%); color: #e9dcc6; transition: opacity .8s; }
+  #loader.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+  #loader h1 { margin: 0; font-size: 12px; letter-spacing: .6em; text-transform: uppercase; font-weight: 500; opacity: .7; }
+  #loader .bar { width: 240px; height: 2px; background: rgba(255,255,255,.12); margin: 0 auto; overflow: hidden; }
+  #loader .bar i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg,#ffb26b,#ffe6b8); transition: width .3s; }
+  #loader .note { font-size: 10px; letter-spacing: .24em; opacity: .45; text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div id="loader">
+    <h1>Emberfall</h1>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="note" id="loader-note">进入森林</div>
+  </div>
+
+  <div id="hud">
+    <div class="panel">
+      <div class="score"><span id="score">0</span><small>琥珀</small></div>
+      <div class="sub" id="phase">WASD 移动 · SHIFT 疾跑 · ESC 暂停</div>
+      <div class="sub" id="fpsline" style="opacity:.42">FPS -- · --</div>
+    </div>
+    <div class="gems"><div class="n"><span id="gem-count">0</span> / <span id="gem-total">0</span></div><div class="l">Amber</div></div>
+    <div class="crosshair"></div>
+  </div>
+
+  <div id="toast">+1 琥珀</div>
+
+  <div id="start">
+    <h1>Emberfall</h1>
+    <div class="tag">A forest of fallen light</div>
+    <div class="keys">
+      <b>W A S D</b> 移动　·　<b>鼠标</b> 转视角　·　<b>Shift</b> 疾跑<br />
+      收集森林里全部 14 枚琥珀
+    </div>
+    <div class="go">点击进入</div>
+  </div>
+
+  <div id="pause"><div>已暂停 · 点击继续</div></div>
+  <div id="win">
+    <h2>琥珀已尽</h2>
+    <p>你带走了森林里所有的光 · 点击重来</p>
+  </div>
+
+    <div class="qpanel" id="qpanel">
+      <div class="qtitle">画质 / QUALITY</div>
+      <div class="qbtns">
+        <button data-q="high">高画质</button>
+        <button data-q="medium" class="active">中画质</button>
+        <button data-q="low">低画质</button>
+      </div>
+      <div class="qmeta" id="qmeta">中画质 · 阴影 1024 · Bloom</div>
+    </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/build/three.module.js",
+      "three/addons/": "./vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

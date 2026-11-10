@@ -1,0 +1,42 @@
+# ---- dependencies ----
+node_modules/
+package-lock.json.bak
+
+# ---- build / dev caches (never ship these) ----
+.cache/
+.cache2/
+.tmp-pelican/
+*.log
+
+# ---- dev preview pages (local iteration only) ----
+preview.html
+preview-hero.html
+
+# ---- secrets / local machine config ----
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+.npmrc
+.netrc
+proxychains.conf
+*.local.json
+
+# ---- OS noise ----
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ---- NEVER ignore the game itself ----
+# assets/**/*.glb, *.gltf, *.bin, *.hdr, *.mp3, *.ogg, *.jpg are all tracked on purpose
+!assets/**/*.glb
+!assets/**/*.gltf
+!assets/**/*.bin
+!assets/**/*.hdr
+!assets/**/*.mp3
+!assets/**/*.ogg
+
+# ---- dev screenshots (only docs/ is shipped) ----
+shots/
